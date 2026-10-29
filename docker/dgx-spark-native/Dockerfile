@@ -15,6 +15,9 @@ RUN --mount=type=bind,target=/context \
  && g++ -O2 -Wall -Wextra -Werror -std=c++17 -shared -fPIC -pthread \
     /opt/dsv41/adapter/row_store.cpp -o /opt/dsv41/adapter/librow_store.so
 ENV PYTHONPATH=/opt/dsv41/adapter:/opt/b12x_next \
+    SGLANG_BUILD_COMMIT=f80c91a4b97e52e17fbcff088aa6b47b6270f6b9 \
+    SGLANG_BUILD_URL=https://github.com/knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4/tree/f744d83ff1626348dd552d3d5179b2fe66215e35 \
+    SGLANG_IMAGE_TAG=docker.io/library/sglang-dsv41-native:f744d83-20261029a \
     OFFLOAD_MODE=nvme NNODES=4 TP_SIZE=4 \
     DSV41_CACHE_GIB=4 DSV41_INDEXER_CHUNKED=1 DSV41_FOLDED_FENCE=1 \
     DSV41_MAX_NEW_TOKENS=0 DSV41_LOOP_ABORT=0 \
