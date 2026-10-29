@@ -90,11 +90,16 @@ python docker/dgx-spark-native/probe.py \
   --output artifacts/sglang-native/business-official.json
 ```
 
-Authentication comes from the existing `API_KEY`, `SGLANG_API_KEY` or
+Authentication comes from the existing `OPENAI_API_KEY`, `API_KEY`, `SGLANG_API_KEY` or
 `VLLM_API_KEY` environment. The evidence contains only the synthetic requests,
 responses and elapsed times. The probe verifies default separate reasoning,
-explicit thinking off, the vLLM thinking alias and a tool round trip. It does
+explicit thinking off, the vLLM thinking alias, a tool round trip, JSON schema,
+streaming finish/usage and native vision. It does
 not measure model quality or prove the entire context window.
+
+For the unchanged lm_eval 0.4.13 five-shot MMLU client, see [MMLU.md](MMLU.md).
+It uses the existing native token-specific output-logprob API without prompt
+logprobs, retokenizing requests, another server or an image rebuild.
 
 Also record all four ranks' image IDs, Ready/restart counts, source provenance,
 NCCL library/plugin paths, native `/server_info` effective context, KV capacity,
