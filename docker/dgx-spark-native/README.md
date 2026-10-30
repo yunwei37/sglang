@@ -10,7 +10,7 @@ python docker/dgx-spark-native/prepare.py
 python docker/dgx-spark-native/validate.py
 docker buildx build --platform linux/arm64 \
   --file artifacts/sglang-native/v262/context/Dockerfile \
-  --tag docker.io/library/sglang-dsv41-native:cfe3cfb-20261030a \
+  --tag docker.io/library/sglang-dsv41-native:cfe3cfb-swa-20261030b \
   --output type=oci,dest=sglang-native-arm64.oci.tar \
   artifacts/sglang-native/v262/context
 ```
@@ -33,7 +33,11 @@ using the installed image headers, without importing Torch or requiring a GPU.
 source anchors, functional dispatch validation and digest provenance.
 `native-runtime.patch` redacts authentication fields and launch arguments in
 startup logs and info readbacks. The underlying authentication values and
-middleware remain unchanged. Native
+middleware remain unchanged. `dspark-swa-budget.patch` uses the actual bundled
+DeepSeek draft stages when budgeting paged SWA, rather than the target's inherited
+40-layer depth. Its CPU resolver regression is
+`python docker/dgx-spark-native/test_dspark_swa_budget.py -v`;
+four-rank startup and workload acceptance remain required. Native
 extra pages and the solo-short-pass scheduler remain off pending field A/B.
 See [PERFORMANCE.md](PERFORMANCE.md) for the retrieved baseline, exact measurement
 definitions, EP1 route and outer-owner acceptance commands.

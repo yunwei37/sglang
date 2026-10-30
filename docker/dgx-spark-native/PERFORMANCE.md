@@ -154,12 +154,38 @@ At memory fraction 0.80, pool sizing failed: the SWA cap was 707,840 tokens,
 15.78 GiB, against an available pool budget of 8.13 GiB. Native max-running
 requests resolved to 256; the default prefix-tail count is four times that,
 1,024. This is actual startup failure evidence, not a throughput result.
-The outer owner is retrying MEM_FRACTION_STATIC=0.90 with context and concurrency
-unchanged. Retain that explicit trial while inspecting full/SWA token capacities,
-post-pool allocations, graph capture and near-1M/vision transient headroom.
+The 0.90 retry subsequently caused NVIDIA allocation failures and loss of all
+four hosts; it is removed after recovery. No equivalent 0.90 retry is active.
+The caller now implements and tests this task directly, as requested;
+no local implementation Agent is delegated.
+
+The next trial retains the 0.80 default, 1,048,576 context and native 256-running
+capacity, and enables the existing upstream
+`--enable-encoder-swa-bounded-replay` path. It uses per-request target SWA
+windows while preserving paged DSpark draft history. The pinned configurator,
+pool constructor and feature validator support this combination. A conservative
+source budget is 1.671 GiB of request-window storage, 1.155 GiB of paged draft
+storage and 1.777 GiB for 1M compressed KV, totaling 4.603 GiB against the prior
+8.13-GiB pool budget. This is an accounting hypothesis, not full allocator or
+inference proof; the raw report is retained in
+`/workspaces/.agent-state/sglang-dev/request-window-budget-20261030.json`.
+The first request-window startup loaded all target and three draft stages, but
+failed before allocation: it charged 17.07 GiB fixed SWA against 10.23 GiB.
+The shared resolver had taken `num_hidden_layers=40` from the bundled target
+config, while the actual DeepSeek DSpark constructor uses the three
+`dspark_target_layer_ids` stages. `dspark-swa-budget.patch` matches that
+constructor's stage-count convention only for DeepSeek V4 DSpark. A CPU test
+executes the real resolver body before and after: 40 becomes 3, fallback depth
+works, and other DSpark/DFLASH models retain their prior counts. The failed
+owner is paused through Git/Flux; no host reboot or new NVIDIA allocation
+failure was observed.
+
+The actual startup, pool capacity, prefix reuse, DSpark generation, frozen MMLU,
+1M retrieval and throughput must all be verified. The public aliases remain
+on the established Qwen drain route during qualification.
+
 Native-page extra-cache savings occur after pool sizing; that feature alone
-does not fix the initial fixed-SWA budget failure. Do not reduce context or
-silently add a concurrency cap to make readiness pass.
+does not fix the initial fixed-SWA budget failure.
 
 The first startup also exposed api_key in INFO server_args dumps. The successor
 applies native-runtime.patch: api_key/admin_api_key and their CLI/Engine launch

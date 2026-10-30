@@ -89,6 +89,11 @@ def main():
         cwd=output,
         check=True,
     )
+    subprocess.run(
+        ["patch", "-p1", "-i", str(here / "dspark-swa-budget.patch")],
+        cwd=output,
+        check=True,
+    )
     shutil.copy2(
         recipe / "runtime/flash_mla_sm120.canary.py",
         output / "python/sglang/kernels/ops/attention/flash_mla_sm120.py",
@@ -134,6 +139,7 @@ def main():
         "recipe_commit": ref,
         "sglang_commit": SGLANG_COMMIT,
         "base_image": BASE_IMAGE,
+        "local_patches": ["native-runtime.patch", "dspark-swa-budget.patch", "pce-provenance.patch"],
         "kernel_packages": {"sglang-kernel": "0.4.7", "sgl-deep-gemm": "0.2.0"},
         "backports": (recipe / "runtime/sglang-canary/PATCHES")
         .read_text()
