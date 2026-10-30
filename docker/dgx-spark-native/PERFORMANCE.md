@@ -162,8 +162,10 @@ does not fix the initial fixed-SWA budget failure. Do not reduce context or
 silently add a concurrency cap to make readiness pass.
 
 The first startup also exposed api_key in INFO server_args dumps. The successor
-applies native-runtime.patch: only api_key/admin_api_key are redacted in the two
-Engine startup log renderings; authentication/config resolution are unchanged.
+applies native-runtime.patch: api_key/admin_api_key and their CLI/Engine launch
+arguments are redacted in the shared diagnostic renderers used by startup logs
+and info readbacks. Runtime authentication values remain unchanged. This also
+keeps speedbench metadata archives from copying a credential via /server_info.
 After all ranks run the successor, remove the temporary warning-only log level
 so normal pool/graph diagnostics are available. Preserve outer log filtering;
 do not retrieve, print, copy or rotate the existing credential.

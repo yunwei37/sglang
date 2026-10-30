@@ -31,8 +31,9 @@ before the EP1 trial and packages the optional native-page prefill module.
 using the installed image headers, without importing Torch or requiring a GPU.
 `pce-provenance.patch` removes the new hash acceptance gates while retaining
 source anchors, functional dispatch validation and digest provenance.
-`native-runtime.patch` redacts the two authentication fields in Engine startup
-logs without changing their resolved values or the authentication middleware. Native
+`native-runtime.patch` redacts authentication fields and launch arguments in
+startup logs and info readbacks. The underlying authentication values and
+middleware remain unchanged. Native
 extra pages and the solo-short-pass scheduler remain off pending field A/B.
 See [PERFORMANCE.md](PERFORMANCE.md) for the retrieved baseline, exact measurement
 definitions, EP1 route and outer-owner acceptance commands.
