@@ -134,3 +134,21 @@ packing/cache, prefill chunking, then speculative adapters. Measure repeated
 runs and actual accepted tokens/step as well as output tokens/s. Do not retain
 optional performance switches without a reproducible fleet A/B and the user's
 selection. Restore the original Flux declaration if a candidate fails.
+
+## Current candidate: upstream v2.6.2 Production profile
+
+The previous stripped launch.py is retired. prepare.py derives production.env
+from the pinned recipe's .env.tp4.example Production block and README release
+gate. The existing fleet wrapper sources that file and runs upstream boot.py
+with the existing injected API credential. All production compute/prefill
+switches are included; the documented switchless-ring NCCL fallback disables
+RoCEnante-specific transport/gather/two-shot switches. No hardware forwarding,
+clock cap, extra response limit or adaptive SWA allocator is introduced.
+
+The profile uses TP4/EP1, 1M context, 16 running requests, static memory 0.78,
+4,194,304 KV tokens, packed local Engram, 4 GiB/16-way cache and 96 I/O threads.
+The encoder-only replay and diagnostic autotune-disable overrides are removed.
+Local production-profile.patch updates checkpoint provenance, avoids persisting
+another API-key copy and removes the four newly enabled source-SHA gates while
+retaining functional validation. Digests remain provenance. Qualification is
+pending; the prior EP1 text baseline is not the upstream performance result.

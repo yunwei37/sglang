@@ -12,7 +12,7 @@ RUN --mount=type=bind,target=/context \
  && cp -a /context/adapter /opt/dsv41/adapter \
  && cp -a /context/b12x_next /opt/b12x_next/b12x_next \
  && cp /context/scripts/pack_engram.py /opt/dsv41/pack_engram.py \
- && cp /context/launch.py /context/provenance.json /context/LICENSE.recipe /context/LICENSE.b12x_next /context/NOTICE.recipe /opt/dsv41/ \
+ && cp /context/boot.py /context/production.env /context/provenance.json /context/LICENSE.recipe /context/LICENSE.b12x_next /context/NOTICE.recipe /opt/dsv41/ \
  && cp -a /context/runtime /opt/dsv41/runtime \
  && g++ -O2 -Wall -Wextra -Werror -std=c++17 -shared -fPIC -pthread \
     /opt/dsv41/adapter/row_store.cpp -o /opt/dsv41/adapter/librow_store.so \
@@ -20,11 +20,12 @@ RUN --mount=type=bind,target=/context \
 ENV PYTHONPATH=/opt/dsv41/adapter:/opt/b12x_next \
     SGLANG_BUILD_COMMIT=f80c91a4b97e52e17fbcff088aa6b47b6270f6b9 \
     SGLANG_BUILD_URL=https://github.com/knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4/tree/cfe3cfb81e27675eaef69e1c65bfc6d63b7315aa \
-    SGLANG_IMAGE_TAG=docker.io/library/sglang-dsv41-native:cfe3cfb-swa-20261030b \
+    SGLANG_IMAGE_TAG=docker.io/library/sglang-dsv41-native:cfe3cfb-production-20261030c \
     OFFLOAD_MODE=nvme NNODES=4 TP_SIZE=4 \
     DSV41_CACHE_GIB=4 DSV41_INDEXER_CHUNKED=1 DSV41_FOLDED_FENCE=1 \
     DSV41_MAX_NEW_TOKENS=0 DSV41_LOOP_ABORT=0 \
     SGLANG_DEFAULT_THINKING=true SGLANG_ROCE_ALLREDUCE=0 \
     SGLANG_RUST_BUILD_MODE=never
 WORKDIR /opt/dsv41
-ENTRYPOINT ["python3", "-u", "/opt/dsv41/launch.py"]
+ENTRYPOINT ["python3", "-u", "/opt/dsv41/boot.py"]
+CMD ["run"]

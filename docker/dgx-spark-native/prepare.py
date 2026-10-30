@@ -35,6 +35,43 @@ def fetch_script(recipe):
     return "\n".join(lines) + "\n"
 
 
+def production_profile(recipe):
+    """Derive the pinned recipe's Production profile, with its documented NCCL ring fallback."""
+    lines = (recipe / ".env.tp4.example").read_text().splitlines()
+    base = dict(line.split("=", 1) for line in lines
+                if line and not line.startswith("#") and "=" in line)
+    keys = ("NNODES TP_SIZE OFFLOAD_MODE DSV41_CACHE_GIB DSV41_IO_THREADS "
+            "DSV41_RESIDENT_SCALES DSV41_CACHE_WAYS CONTEXT_LENGTH MAX_RUNNING_REQUESTS").split()
+    profile = {key: base[key] for key in keys}
+    production = lines[next(i for i, line in enumerate(lines)
+                            if line.startswith("# Production profile")):]
+    for line in production:
+        if line.startswith("#EXTRA_CONTAINER_ENV="):
+            for item in shlex.split(line.split("=", 1)[1])[0].split():
+                key, value = item.split("=", 1)
+                profile[key] = value
+        elif line.startswith(("#CHUNKED_PREFILL_SIZE=", "#MEM_FRACTION_STATIC=", "#EXTRA_SGLANG_ARGS=")):
+            key, value = line[1:].split("=", 1)
+            profile[key] = shlex.split(value)[0]
+    # README's latest release gate supersedes the older 8M example KV pool.
+    import re
+    pin = re.search(r"KV pinned at ([\d,]+)", (recipe / "README.md").read_text())
+    profile.update(EP_SIZE="1", MAX_TOTAL_TOKENS=pin.group(1).replace(",", ""),
+                   SGLANG_ROCE_ALLREDUCE="0", STATE_PATH="/cache/sglang-native",
+                   DSV41_PACKED_DIR="/cache/engram-tp4", SERVER_PORT="8000",
+                   SKIP_PREPARE="1", SKIP_SMOKE="1",
+                   DSV41_MAX_NEW_TOKENS="0", DSV41_LOOP_ABORT="0",
+                   SGLANG_DEFAULT_THINKING="true")
+    # No opposite-node RoCE hardware path is installed on this fleet.
+    for key in ("SGLANG_ROCE_MAX_SIZE", "B12X_ROCE_HCA", "B12X_ROCE_CACHE_DIR",
+                "DSV41_ROCE_GATHER", "DSV41_ROCE_TWOSHOT", "DSV41_ROCE_TWOSHOT_ROWS",
+                "B12X_ROCE_PIPE_BLOCKS", "B12X_ROCE_PIPE_CHUNK_BYTES"):
+        profile.pop(key, None)
+    for key, value in profile.items():
+        profile[key] = value.replace("/state/", "/cache/sglang-native/")
+    return profile
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -84,6 +121,15 @@ def main():
             ),
         )
     here = Path(__file__).resolve().parent
+    shutil.copy2(recipe / "boot.py", output / "boot.py")
+    subprocess.run(
+        ["patch", "-p1", "-i", str(here / "production-profile.patch")],
+        cwd=output, check=True,
+    )
+    profile = production_profile(recipe)
+    (output / "production.env").write_text("\n".join(
+        f"{key}={shlex.quote(value)}" for key, value in profile.items()
+    ) + "\n")
     subprocess.run(
         ["patch", "-p1", "-i", str(here / "native-runtime.patch")],
         cwd=output,
@@ -127,7 +173,7 @@ def main():
         "",
     )
     compat.write_text(text)
-    for name in ["Dockerfile", "launch.py"]:
+    for name in ["Dockerfile"]:
         shutil.copy2(here / name, output / name)
     for src, dst in [
         (recipe / "LICENSE", "LICENSE.recipe"),
@@ -139,7 +185,7 @@ def main():
         "recipe_commit": ref,
         "sglang_commit": SGLANG_COMMIT,
         "base_image": BASE_IMAGE,
-        "local_patches": ["native-runtime.patch", "dspark-swa-budget.patch", "pce-provenance.patch"],
+        "local_patches": ["native-runtime.patch", "dspark-swa-budget.patch", "pce-provenance.patch", "production-profile.patch"],
         "kernel_packages": {"sglang-kernel": "0.4.7", "sgl-deep-gemm": "0.2.0"},
         "backports": (recipe / "runtime/sglang-canary/PATCHES")
         .read_text()
