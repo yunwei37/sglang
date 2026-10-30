@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 RECIPE_REPO = "https://github.com/knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4.git"
-RECIPE_COMMIT = "f744d83ff1626348dd552d3d5179b2fe66215e35"
+RECIPE_COMMIT = "cfe3cfb81e27675eaef69e1c65bfc6d63b7315aa"
 SGLANG_COMMIT = "f80c91a4b97e52e17fbcff088aa6b47b6270f6b9"
 BASE_IMAGE = "lmsysorg/sglang@sha256:b4a4745fab5393dc0aca573fe754b86477f57691c9e971390b21102d3d94ebf9"
 
@@ -38,10 +38,10 @@ def fetch_script(recipe):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--output", type=Path, default=Path("artifacts/sglang-native/context")
+        "--output", type=Path, default=Path("artifacts/sglang-native/v262/context")
     )
     parser.add_argument(
-        "--recipe", type=Path, default=Path("artifacts/sglang-native/recipe")
+        "--recipe", type=Path, default=Path("artifacts/sglang-native/recipe-cfe3cfb")
     )
     args = parser.parse_args()
     recipe = args.recipe.resolve()
@@ -83,10 +83,31 @@ def main():
                 "__pycache__", "*.pyc", "*.so", "*.orig", "*.rej"
             ),
         )
+    here = Path(__file__).resolve().parent
+    subprocess.run(
+        ["patch", "-p1", "-i", str(here / "native-runtime.patch")],
+        cwd=output,
+        check=True,
+    )
     shutil.copy2(
         recipe / "runtime/flash_mla_sm120.canary.py",
         output / "python/sglang/kernels/ops/attention/flash_mla_sm120.py",
     )
+    pce = output / "runtime/flashinfer_pce"
+    pce.mkdir(parents=True, exist_ok=True)
+    for name in ["gen_pce_sources.py", "APPROVED_CLOSURE.json", "PROVENANCE.json"]:
+        shutil.copy2(recipe / "runtime/flashinfer_pce" / name, pce / name)
+    shutil.copy2(
+        recipe / "runtime/flashinfer_pce/dsv41_pce.py",
+        output / "python/sglang/kernels/ops/attention/dsv41_pce.py",
+    )
+    subprocess.run(
+        ["patch", "-p1", "-i", str(here / "pce-provenance.patch")],
+        cwd=output,
+        check=True,
+    )
+    shutil.copy2(here / "build_pce.py", pce / "build_pce.py")
+    shutil.copy2(recipe / "NOTICE", output / "NOTICE.recipe")
     # Apply the recipe's native text-placeholder encoding fix to the staged tree.
     patch = (recipe / "runtime/patch_encoding_dsv41.py").read_text()
     patch = patch.replace("/sgl-workspace/sglang/python", str(output / "python"))
@@ -101,7 +122,6 @@ def main():
         "",
     )
     compat.write_text(text)
-    here = Path(__file__).resolve().parent
     for name in ["Dockerfile", "launch.py"]:
         shutil.copy2(here / name, output / name)
     for src, dst in [
@@ -121,6 +141,10 @@ def main():
         "b12x_next_commit": (recipe / "runtime/b12x_next/b12x_next/SOURCE_COMMIT")
         .read_text()
         .strip(),
+        "b12x_next_patches": (recipe / "runtime/b12x_next/b12x_next/SOURCE_PATCH")
+        .read_text()
+        .strip(),
+        "native_extra_pages": "prebuilt sm_121a; opt-in; digests are provenance only",
     }
     (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     print(f"Prepared {output}")

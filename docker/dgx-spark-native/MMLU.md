@@ -120,6 +120,31 @@ native protocol for all three SGLang checkpoints. Cross-engine differences
 can also reflect kernels, reductions, cache state, chunking and batch shapes;
 same inputs do not establish bitwise logits equivalence or model quality.
 
+## Retrieved baseline and ready-to-replay pilot
+
+On 2026-10-30 the existing Filer archives were read in this Workspace. The
+saved samples reproduce 12,077/14,042 full-set answers (14,015 unique contexts),
+103/114 one-forward pilot answers and 105/114 teacher-forced pilot answers.
+The latter two have identical reconstructed contexts for all 114 prompt hashes;
+the changed winners are college_computer_science doc 1 and public_relations
+doc 1. `artifacts/sglang-native/baseline/baseline-review.json` retains their
+actual four scores and margins. This is analysis of real saved vLLM results,
+not a new SGLang score.
+
+`native-eval-client-20261030.tar.gz` is available in the same existing Filer
+evaluation directory. It includes this client, probes, performance instructions
+and both frozen 114-context references. Token IDs were reconstructed with the
+fixed official tokenizer and add_bos_token=false. The outer handoff now confirms
+PreTrainedTokenizerFast, add_special_tokens=False/add_bos_token=false. Run:
+
+```sh
+python mmlu_native.py replay --prompts vllm-oneforward-pilot-frozen.jsonl \
+  --native-url "$EXISTING_BACKEND_GENERATE_URL" --output sglang-official-pilot.jsonl
+```
+
+This consumes the saved context IDs directly and never regenerates few-shot
+prompts. Keep the reference-teacher-forced file for separate comparisons.
+
 ## Local validation and field acceptance
 
 Run the source/adapter tests with lm_eval 0.4.13, the official tokenizer files

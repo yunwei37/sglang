@@ -16,10 +16,10 @@ import time
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--context", type=Path, default=Path("artifacts/sglang-native/context")
+        "--context", type=Path, default=Path("artifacts/sglang-native/v262/context")
     )
     parser.add_argument(
-        "--recipe", type=Path, default=Path("artifacts/sglang-native/recipe")
+        "--recipe", type=Path, default=Path("artifacts/sglang-native/recipe-cfe3cfb")
     )
     args = parser.parse_args()
     context = args.context.resolve()

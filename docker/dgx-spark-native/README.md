@@ -1,7 +1,7 @@
 # Native DeepSeek V4.1 on the four-Spark ring
 
 This directory stages the native FP8/FP4 SGLang recipe from
-[knapcio's project](https://github.com/knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4/tree/f744d83ff1626348dd552d3d5179b2fe66215e35).
+[knapcio's project](https://github.com/knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4/tree/cfe3cfb81e27675eaef69e1c65bfc6d63b7315aa).
 It does not deploy or change the existing model service. Infrastructure and GPU
 handover remain with the `spark-manage` Flux owner.
 
@@ -9,13 +9,14 @@ handover remain with the `spark-manage` Flux owner.
 python docker/dgx-spark-native/prepare.py
 python docker/dgx-spark-native/validate.py
 docker buildx build --platform linux/arm64 \
-  --file artifacts/sglang-native/context/Dockerfile \
-  --tag ghcr.io/yunwei37/dgx-spark-4-ring-no-switch:sglang-native-f744d83 \
+  --file artifacts/sglang-native/v262/context/Dockerfile \
+  --tag docker.io/library/sglang-dsv41-native:cfe3cfb-20261030a \
   --output type=oci,dest=sglang-native-arm64.oci.tar \
-  artifacts/sglang-native/context
+  artifacts/sglang-native/v262/context
 ```
 
-Use an immutable published digest for deployment. The generated
+Import the fixed OCI tag through the existing containerd lifecycle, or use a
+published image digest. The generated
 `provenance.json` records the recipe commit, SGLang commit, ordered backports,
 base ARM64 manifest and kernel package versions. No checkpoint download or
 SHA256 download/install/startup/acceptance check is added. The base is the
@@ -23,7 +24,18 @@ ARM64 manifest of `lmsysorg/sglang:dev-dsv41`, resolved on 2026-10-29. Its bundl
 FlashInfer is 0.6.18. The two updated packages are `sglang-kernel==0.4.7` and
 `sgl-deep-gemm==0.2.0`. Recipe adapters carry their upstream AGPL-3.0 license;
 the image includes it and the b12x_next license. Local adapter changes are
-reproducible from `prepare.py`.
+reproducible from `prepare.py`. The previous f744d83 image and its sources remain
+available; the latest source adds the upstream b12x producer-claim barrier fix
+before the EP1 trial and packages the optional native-page prefill module.
+`build_pce.py` compiles its unchanged FlashInfer kernel templates for sm_121a
+using the installed image headers, without importing Torch or requiring a GPU.
+`pce-provenance.patch` removes the new hash acceptance gates while retaining
+source anchors, functional dispatch validation and digest provenance.
+`native-runtime.patch` redacts the two authentication fields in Engine startup
+logs without changing their resolved values or the authentication middleware. Native
+extra pages and the solo-short-pass scheduler remain off pending field A/B.
+See [PERFORMANCE.md](PERFORMANCE.md) for the retrieved baseline, exact measurement
+definitions, EP1 route and outer-owner acceptance commands.
 
 ## Differences from the upstream switched profile
 
@@ -35,7 +47,7 @@ reproducible from `prepare.py`.
 | EP2 with FlashInfer MXFP4 initially | At TP4/EP1 the expert width is 2304/4=576, which is not divisible by the backend's required 128. The packaged b12x_next EP1 route is an A/B candidate. |
 | NVMe Engram, bounded indexer, SM12x split metadata, SWA safety backports and folded-result fence | Required memory/correctness adaptations for the native path; full Engram tables cannot occupy Spark unified memory. |
 | Upstream output cap and repetition abort disabled | Preserve native completion semantics and the client's requested budget. |
-| No upstream checksum gates | User requirement. The optional Anthropic validator source-hash gate is removed; its behavior and idempotency checks remain. |
+| No extra checksum gates in preparation/build/default serving | User requirement. Anthropic and native-page source/module digests do not gate execution; functional and idempotency checks remain. Other optional adapters retain upstream behavior while disabled. |
 | Initial memory fraction 0.80, row cache 4 GiB, graph batch sizes through 16 | Diagnostic starting values from the recipe, pending fleet measurements. The adapter's 64 GiB default cache plus model/KV is unsuitable for unified memory; large speculative graph pools also consume it. Running/queue capacities remain engine defaults; graph size is not a concurrency cap. |
 
 Other optional performance adapters are packaged but remain disabled. No
