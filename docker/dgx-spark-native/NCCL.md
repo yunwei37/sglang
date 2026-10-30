@@ -1,14 +1,15 @@
 # NCCL 2.30.7 switchless-ring candidate
 
 This is an experimental transport candidate, not a production throughput result.
-The serving service remains on NCCL 2.29.7 and Mesh while this candidate is tested.
+The retained baseline is NCCL 2.29.7/Mesh. A bounded full-service candidate trial
+was restored to that baseline after an application logprob normalization crash.
 
 ## Sources and minimal fix
 
 - NVIDIA NCCL v2.30.7-1: 73cf112295c33aee2b895f329f592f2a9b4b0f97.
 - Cumulative dual-PCI/subnet patch: FujitsuPolycom/sparkring,
   9932204d25ab857ec4a5a7c437f4dc0f5bddee2e,
-  spark_transport/nccl/ (see pinned DUAL_PCI_DOMAIN.md and cumulative patch).
+  spark_transport/nccl/nccl-2.30.7-dual-pci-domain.patch.
 - CTS acquire fence: NVIDIA/nccl#2393, as carried by the SGLang recipe
   knapcio/DeepSeek-V4.1-Flash-4x-DGX-Spark-TP4 at
   cfe3cfb81e27675eaef69e1c65bfc6d63b7315aa.
@@ -74,3 +75,41 @@ for the routing issue and is not retained.
 Earlier B2/C1 mixed-library tests are preliminary and superseded by these
 single-runtime trials. Full speedbench, concurrent serving, quality, stability,
 and real 1M acceptance for this transport remain unmeasured.
+
+
+## CUDA Graph qualification and first serving attempt
+
+H1/I1 repeated the operations in captured 32-collective blocks on a side stream.
+All 32 checks passed per trial and generation resumed after 3.59/1.97 seconds.
+Max-rank median microseconds:
+
+| Operation / rows | Mesh H1 | Physical-PF fix + max channels 4 I1 |
+| --- | ---: | ---: |
+| AllReduce / 1 | 106.78 | 44.45 |
+| AllReduce / 6 | 132.73 | 63.14 |
+| AllReduce / 24 | 843.38 | 92.32 |
+| AllReduce / 96 | 874.95 | 171.54 |
+| AllGather / 1 | 97.82 | 26.85 |
+| AllGather / 6 | 236.94 | 39.81 |
+| AllGather / 24 | 1913.88 | 58.82 |
+| AllGather / 96 | 754.10 | 92.89 |
+
+The experimental carrier is published as
+ghcr.io/yunwei37/dgx-spark-4-ring-no-switch:nccl-2.30.7-ring-physical-20261030a
+with manifest sha256:8b010622708a66f0263635653c5ca26a4edada3eb74fae79541e0f9db9b55468.
+The existing publisher succeeded and all four machines pulled the ARM64 image.
+
+The first full-service attempt reached Ready and loaded exactly one 2.30.7
+runtime per process. Its quality pilot then crashed Python normalization:
+a token-ID logprob row was already a list, but the result processor called
+tolist unconditionally. No speedbench result was produced and no NCCL error
+was observed. The baseline transport was restored. Treat this as a failed
+application acceptance attempt, not proof of either transport regression or
+end-to-end improvement.
+
+The native-runtime.patch now normalizes the documented list-or-Tensor union
+at both prefill and decode consumers. A regression invokes the actual
+token-ID producer and both consumers, including an empty requested-ID row.
+All four eager/delayed consumer cases failed before the fix and pass after it;
+the full ten-test CPU MMLU protocol suite passes. These tests do not establish
+GPU/model quality acceptance. Rerun the real pilot before the serving A/B.
