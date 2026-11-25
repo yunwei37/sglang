@@ -45,31 +45,10 @@ logger = logging.getLogger(__name__)
 
 FLASHINFER_AUTOTUNE_WORKAROUND_SKIPS = frozenset()
 
-# sm120 (consumer/workstation Blackwell) resolves its FP4 runner backend to
-# flashinfer_cutlass, and the CUDA-graph capture path autotunes the NVFP4 lm_head
-# GEMM there (the decode and draft graph runners pass run_lm_head=True). Profiling
-# that GEMM faults the process -- SIGSEGV in the driver at cuStreamSynchronize --
-# so an sm120 serve whose lm_head is NVFP4 dies during graph capture.
-#
-# Skipping fp4_gemm leaves FlashInfer's heuristic tactic in place: still a correct
-# kernel, just chosen without measurement -- the same trade the mxfp8_gemm IMA
-# skip used to make on this hook. get_flashinfer_autotune_skip_ops feeds the
-# autotune cache key, so sm120 never reuses tactics that were tuned with
-# profiling on.
-_SM120_AUTOTUNE_WORKAROUND_SKIPS = frozenset({"fp4_gemm"})
-
-
-def _device_autotune_workaround_skips(model_runner: ModelRunner) -> frozenset[str]:
-    major, _ = torch.cuda.get_device_capability(model_runner.device)
-    if major == 12:
-        return _SM120_AUTOTUNE_WORKAROUND_SKIPS
-    return frozenset()
-
 
 def get_flashinfer_autotune_skip_ops(model_runner: ModelRunner) -> set[str]:
     skip_ops = set(get_exec().kernel.flashinfer_autotune_skip_ops or ())
     skip_ops.update(FLASHINFER_AUTOTUNE_WORKAROUND_SKIPS)
-    skip_ops.update(_device_autotune_workaround_skips(model_runner))
     return skip_ops
 
 
